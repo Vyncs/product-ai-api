@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+Pillow
+transformers
+torch
+easyocr
+numpy
+webcolors
+rembg
+onnxruntime
