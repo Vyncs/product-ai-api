@@ -1,6 +1,6 @@
 fastapi
-uvicorn
-Pillow
+uvicorn[standard]
+pillow
 transformers
 torch
 easyocr
