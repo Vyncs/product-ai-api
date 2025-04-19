@@ -91,7 +91,7 @@ async def extract(image: UploadFile, title: str = Form(...), description: str = 
     original_bytes = await image.read()
     image_no_bg_bytes = remove_background(original_bytes)
 
-    # BLIP Caption com imagem sem fundo
+    # BLIP Caption com imagem sem fundote
     caption = describe_image(image_no_bg_bytes)
 
     # OCR com imagem sem fundo
