@@ -8,8 +8,6 @@ import numpy as np
 import torch
 import io
 import webcolors
-import os
-import uvicorn
 
 app = FastAPI()
 
@@ -113,7 +111,3 @@ async def extract(image: UploadFile, title: str = Form(...), description: str = 
         "dominant_color": dominant_color,
         "attributes": attributes
     })
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
