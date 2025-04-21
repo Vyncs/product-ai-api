@@ -13,9 +13,17 @@ import uvicorn
 
 app = FastAPI()
 
-# Carrega o modelo BLIP Large com suporte a prompts
-processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
-model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
+# Variáveis globais para os modelos
+processor = None
+model = None
+ocr_reader = None
+
+@app.on_event("startup")
+async def load_models():
+    global processor, model, ocr_reader
+    processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
+    model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
+    ocr_reader = easyocr.Reader(['pt', 'en'], gpu=False)
 
 # Remove o fundo branco da imagem
 def remove_background(image_bytes):
@@ -29,9 +37,8 @@ def describe_image(image_bytes):
     return caption
 
 def extract_text_from_image(image_bytes):
-    reader = easyocr.Reader(['pt', 'en'], gpu=False)
     image_np = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-    results = reader.readtext(np.array(image_np))
+    results = ocr_reader.readtext(np.array(image_np))
     ocr_text = " ".join([res[1] for res in results])
     return ocr_text
 
@@ -49,19 +56,15 @@ def extract_attributes(text):
     return {
         "gender": gender,
         "age_group": age_group,
-        "color": "desconhecida",  # A cor será preenchida mais tarde
+        "color": "desconhecida",  # Será preenchida mais tarde
         "size": size,
         "material": material
     }
 
-# Função para encontrar a cor mais próxima da cor dominante usando webcolors
 def closest_color(requested_color):
-    """ Encontra o nome da cor mais próxima para o valor RGB fornecido. """
     try:
-        # Tenta obter o nome exato
         return webcolors.rgb_to_name(requested_color, spec='css3')
     except ValueError:
-        # Se não encontrar, calcula a cor mais próxima
         min_distance = float('inf')
         closest_name = None
 
@@ -76,30 +79,20 @@ def closest_color(requested_color):
 
         return closest_name or webcolors.rgb_to_hex(requested_color)
 
-# Função para obter a cor dominante da imagem
 def get_dominant_color(image_bytes):
     image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     image = image.resize((50, 50))
-    pixels = np.array(image)
-    pixels = pixels.reshape((-1, 3))
-
+    pixels = np.array(image).reshape((-1, 3))
     avg_color = pixels.mean(axis=0)
-    dominant_color = tuple(map(int, avg_color))
-
-    return dominant_color
+    return tuple(map(int, avg_color))
 
 @app.post("/extract-attributes")
 async def extract(image: UploadFile, title: str = Form(...), description: str = Form(...)):
     original_bytes = await image.read()
     image_no_bg_bytes = remove_background(original_bytes)
 
-    # BLIP Caption com imagem sem fundote
     caption = describe_image(image_no_bg_bytes)
-
-    # OCR com imagem sem fundo
     ocr_text = extract_text_from_image(image_no_bg_bytes)
-
-    # Cor dominante da imagem sem fundo
     dominant_color = get_dominant_color(image_no_bg_bytes)
     color_name = closest_color(dominant_color)
 
@@ -115,5 +108,5 @@ async def extract(image: UploadFile, title: str = Form(...), description: str = 
     })
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))  # 8000 como fallback
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
